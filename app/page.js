@@ -4,13 +4,12 @@ import styles from './page.module.css'
 import React, {useState} from "react";
 const ethers = require("ethers");
 
-//Connect to metamask
-//execute a function
 export default function Home() {
   const [isConnected, setIsConnected] = useState(false);
   const [nftItems, setNftItems] = useState([]);
   const [signer, setSigner] = useState();
 
+  //Connect your wallet
   async function connect()
   {
     if(typeof window.ethereum !== "undefined")
@@ -33,32 +32,26 @@ export default function Home() {
     }
   }
 
-  async function execute()
+  async function bossHealth()
   {
-    if (typeof window.ethereum !== "undefined")
-    {
-      const bossAddress = "0x35933cCf6ba86612CE9e763576129F866E4768cd";
-      const bossAbi = [{"inputs":[],"stateMutability":"nonpayable","type":"constructor"},{"anonymous":false,"inputs":[],"name":"GameWon","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"previousOwner","type":"address"},{"indexed":true,"internalType":"address","name":"newOwner","type":"address"}],"name":"OwnershipTransferred","type":"event"},{"inputs":[{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"decreaseHealth","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"gameWon","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"health","outputs":[{"internalType":"int256","name":"","type":"int256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"renounceOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"newOwner","type":"address"}],"name":"transferOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"}];
+    const bossAddress = "0x35933cCf6ba86612CE9e763576129F866E4768cd";
+    const bossAbi = [{"inputs":[],"stateMutability":"nonpayable","type":"constructor"},{"anonymous":false,"inputs":[],"name":"GameWon","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"previousOwner","type":"address"},{"indexed":true,"internalType":"address","name":"newOwner","type":"address"}],"name":"OwnershipTransferred","type":"event"},{"inputs":[{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"decreaseHealth","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"gameWon","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"health","outputs":[{"internalType":"int256","name":"","type":"int256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"renounceOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"newOwner","type":"address"}],"name":"transferOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"}];
 
-      const provider = new ethers.providers.Web3Provider(window.ethereum);
-      const signer = provider.getSigner();
-      const contract = new ethers.Contract(bossAddress, bossAbi, signer);
-      try {
-        const healthVal = await contract.health();
-        console.log("Boss Health", healthVal);
-        document.getElementById("health").innerHTML = healthVal;
-      }
-      catch(error)
-      {
-        console.log(error)
-      }
+    const provider = new ethers.providers.Web3Provider(window.ethereum);
+    const signer = provider.getSigner();
+    const contract = new ethers.Contract(bossAddress, bossAbi, signer);
+    try {
+      const healthVal = await contract.health();
+      console.log("Boss Health", healthVal);
+      document.getElementById("health").innerHTML = healthVal;
     }
-    else
+    catch(error)
     {
-      document.getElementById("executeButton").innerHTML = "Please install MetaMask";
+      console.log(error)
     }
   }
 
+  //List tokens owned by the address
   async function list()
   {
     if(typeof window.ethereum !== "undefined")
@@ -75,11 +68,13 @@ export default function Home() {
       console.log(methodNames);*/
       const items = [];
 
+      const accounts = await ethereum.request({ method: "eth_accounts" });
+
       try {
-        const tokenCount = await contract.balanceOf("0xED321E8640f74e81019c4dc803dfBa347823a95D");
+        const tokenCount = await contract.balanceOf(accounts[0]);
         console.log(`You have: ${tokenCount.toString()} NFTs`);
 
-        const tokenIds = await contract.getOwnedTokens("0xED321E8640f74e81019c4dc803dfBa347823a95D");
+        const tokenIds = await contract.getOwnedTokens(accounts[0]);
         //console.log("You own tokens: ", tokenIds[0].toNumber());
 
         for(let i  = 0; i < tokenCount; i++)
@@ -97,6 +92,7 @@ export default function Home() {
     }
   }
 
+  //Perform the attack on the boss
   async function attack(tokenId)
   {
     console.log("ID", tokenId);
@@ -110,10 +106,27 @@ export default function Home() {
 
     try 
     {
-      //const test = await contract.attack(id);
       const transaction = await contract.attack(tokenId, { gasLimit: 300000 });
       await transaction.wait();
       console.log(transaction);
+
+      const updatedTokenData = await contract.fighters(tokenId);
+
+      // Update the attacksAmt in the state
+      setNftItems(prevItems => {
+        const updatedItems = prevItems.map(item => {
+          // Create a new object for the updated item
+          if (item.id === tokenId) {
+            bossHealth();
+            return {
+              ...item,
+              attacksAmt: updatedTokenData.attacksAmt,
+            };
+          }
+          return item;
+        });
+        return updatedItems;
+      });
     }
     catch(error) {
       console.error('Error attacking', error);
@@ -125,21 +138,18 @@ export default function Home() {
       {isConnected ? (
         <>
           <div id='connectedAddy'></div>
-          <button className={styles.btn} onClick={() => execute()}>Check Boss Health</button>
+          <button className={styles.btn} onClick={() => bossHealth()}>Check Boss Health</button>
           <div id='health'>0000</div>
+          <button className={styles.btn} onClick={() => list()}>List</button>
+          <ul>
+            {nftItems.map((item, index) => (
+              <li key={index}>Token id: {item.id}, Power: {item.power}, Attacks Amount: {item.attacksAmt} <button id='attack' onClick={() => attack(item.id)}>Attack</button></li>
+            ))}
+          </ul>
         </>
         ) : (
         <button className={styles.btn} onClick={() => connect()}>Connect</button>
       )}
-      <>
-        <button className={styles.btn} onClick={() => list()}>List</button>
-        <ul>
-        {nftItems.map((item, index) => (
-          <li key={index}>Token id: {item['id']}, Power: {item['power']}, Attacks Amount: {item['attacksAmt']} <button id='attack' onClick={() => attack(item['id'])}>Attack</button></li>
-        ))}
-      </ul>
-      </>
     </div>
-    
   );
 }
